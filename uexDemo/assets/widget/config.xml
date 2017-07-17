@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<widget appId="10030629" channelCode="000" version="0.1" widgetId="">
+    <name>Cordova sqlite storage plugin</name>
+    <description>Native interface to SQLite for PhoneGap/Cordova. Allows you to use more storage and
+        provides more flexibility than the standard Web SQL database (window.openDatabase).
+    </description>
+    <author email="mzhuzhiqiang@163.com">Litehelpers/Various</author>
+    <icon src="icon.png" />
+    <license href="http://3g2win.com" />
+    <content encoding="utf-8" src="index2.html" />
+    <logserverip>192.168.1.28</logserverip>
+    <obfuscation>false</obfuscation>
+    <updateurl>http://192.168.1.28:8080/widget/update</updateurl>
+    <showmyspace>true</showmyspace>
+    <bgcolor>#fefefe</bgcolor>
+    <widgetOne version="[widgetOneVersion]" />
+    <orientation>15</orientation>
+</widget>
