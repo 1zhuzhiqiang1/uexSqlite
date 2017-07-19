@@ -8,16 +8,74 @@
 
     <script type="text/javascript">
 
+        var db_name = "test_db";
+
         function test_openDatabase() {
-            var param = [
-                {
-                    name: "test_db"
+            var param = [{name: db_name, location: "default"}];
+            SQLitePlugin.open(JSON.stringify(param), function (error, data) {
+                if (error) {
+                    alert("error:" + JSON.stringify(data));
+                } else {
+                    alert("OK:" + JSON.stringify(data));
                 }
-            ];
-            SQLitePlugin.open(JSON.stringify(param), function (data) {
-                alert(data);
             });
         }
+
+        function test_createTable() {
+            var tropts = [];
+            tropts.push(
+//                    {sql: "DROP TABLE IF EXISTS MyTable", parmas: null},
+//                    {sql: "create table MyTable (SampleColumn)", params: null},
+                    {sql: "INSERT INTO MyTable VALUES (?)", params: ['test-value']},
+                    {sql: "INSERT INTO MyTable VALUES (?)", params: ['zhuzhiqiang']});
+            var parmas = [
+                {
+                    dbargs: {
+                        dbname: db_name
+                    },
+                    executes: tropts
+                }
+            ];
+            SQLitePlugin.executeSql(JSON.stringify(parmas), function (error, data) {
+                if (error) {
+                    alert("error:" + JSON.stringify(data));
+                } else {
+                    alert("ok:" + JSON.stringify(data));
+                }
+            });
+        }
+
+        function test_select() {
+            var tropts = [];
+            tropts.push(
+                    {
+//                        sql: "select * from MyTable where SampleColumn = (?)", params: ['zhuzhiqiang']
+                        sql: "select * from MyTable", params: null
+                    }
+            );
+            var parmas = [
+                {
+                    dbargs: {
+                        dbname: db_name
+                    },
+                    executes: tropts
+                }
+            ];
+            SQLitePlugin.executeSql(JSON.stringify(parmas), function (error, data) {
+                if (error) {
+                    alert("error:" + JSON.stringify(data));
+                } else {
+                    alert("ok:" + JSON.stringify(data));
+                }
+            });
+        }
+
+        function test_closeDB() {
+            SQLitePlugin.close(db_name, function (error, data) {
+                alert(JSON.stringify(data));
+            })
+        }
+
 
     </script>
 </head>
@@ -26,23 +84,23 @@
 <div class="tit">uexDemo对象</div>
 <div class="conbor">
     <div class="consj">
-        <span>打开数据库</span>
+        <span>1.打开数据库</span>
         <input class="btn" type="button" value="test_openDatabase"
                onclick="test_openDatabase()"><br>
 
-        <span>2.test_vibrator接口</span>
+        <span>2.建表</span>
         <!--此接口将调用设备的震动，需输入震动时间，单位为毫秒-->
-        <input class="btn" type="button" value="test_vibrator"
-               onclick="openv();"><br>
+        <input class="btn" type="button" value="test_createTable"
+               onclick="test_createTable();"><br>
 
-        <span>3.test_showInputDialog接口</span>
+        <span>3.查询</span>
         <!--此接口将打开一个自定义的输入框，并获取其操作后的返回值。-->
-        <input class="btn" type="button" value="test_showInputDialog"
-               onclick="showInputDialog();"><br>
+        <input class="btn" type="button" value="test_select"
+               onclick="test_select()"><br>
 
-        <span>4.test_addFragment接口</span>
+        <span>4.关闭数据库</span>
         <!--此接口将打开一个自定义的FragmentView添加到当前屏幕上。-->
-        <input class="btn" type="button" value="test_addFragment" onclick="addFragment();"><br>
+        <input class="btn" type="button" value="test_closeDB" onclick="test_closeDB();"><br>
 
         <span>5.test_removeFragment接口</span>
         <!--此接口将从屏幕上移除刚刚打开的FragmentView。-->

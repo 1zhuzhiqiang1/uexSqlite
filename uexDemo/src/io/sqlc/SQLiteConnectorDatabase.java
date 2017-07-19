@@ -79,34 +79,26 @@ class SQLiteConnectorDatabase extends SQLiteAndroidDatabase {
      */
     @Override
     void executeSqlBatch(String[] queryarr, JSONArray[] jsonparams, final int funcCallback) {
-
         if (mydb == null) {
             // not allowed - can only happen if someone has closed (and possibly deleted) a database and then re-used the database
             this.sqLitePlugin.callbackToJs(funcCallback, false, 1, "database has been closed");
             return;
         }
-
         int len = queryarr.length;
         JSONArray batchResults = new JSONArray();
-
         for (int i = 0; i < len; i++) {
             int rowsAffectedCompat = 0;
             boolean needRowsAffectedCompat = false;
-
             JSONObject queryResult = null;
-
             String errorMessage = "unknown";
             int sqliteErrorCode = -1;
             int code = 0; // SQLException.UNKNOWN_ERR
-
             try {
                 String query = queryarr[i];
-
                 long lastTotal = mydb.getTotalChanges();
                 queryResult = this.executeSQLiteStatement(query, jsonparams[i], funcCallback);
                 long newTotal = mydb.getTotalChanges();
                 long rowsAffected = newTotal - lastTotal;
-
                 queryResult.put("rowsAffected", rowsAffected);
                 if (rowsAffected > 0) {
                     long insertId = mydb.getLastInsertRowid();
@@ -119,7 +111,6 @@ class SQLiteConnectorDatabase extends SQLiteAndroidDatabase {
                 sqliteErrorCode = ex.getErrorCode();
                 errorMessage = ex.getMessage();
                 Log.v("executeSqlBatch", "SQLitePlugin.executeSql[Batch](): SQL Error code = " + sqliteErrorCode + " message = " + errorMessage);
-
                 switch (sqliteErrorCode) {
                     case SQLCode.ERROR:
                         code = 5; // SQLException.SYNTAX_ERR
@@ -140,30 +131,26 @@ class SQLiteConnectorDatabase extends SQLiteAndroidDatabase {
                 code = 0; // SQLException.UNKNOWN_ERR
                 Log.e("executeSqlBatch", "SQLitePlugin.executeSql[Batch](): UNEXPECTED JSON Error=" + errorMessage);
             }
-
             try {
                 if (queryResult != null) {
                     JSONObject r = new JSONObject();
-
                     r.put("type", "success");
                     r.put("result", queryResult);
-
                     batchResults.put(r);
                 } else {
                     JSONObject r = new JSONObject();
                     r.put("type", "error");
-
                     JSONObject er = new JSONObject();
                     er.put("message", errorMessage);
                     er.put("code", code);
                     r.put("result", er);
-
                     batchResults.put(r);
                 }
             } catch (JSONException ex) {
                 ex.printStackTrace();
                 Log.e("executeSqlBatch", "SQLitePlugin.executeSql[Batch](): Error=" + ex.getMessage());
                 // TODO what to do?
+                this.sqLitePlugin.callbackToJs(funcCallback, false, 1, ex.getMessage());
             }
         }
         this.sqLitePlugin.callbackToJs(funcCallback, false, 0, batchResults);
@@ -182,44 +169,32 @@ class SQLiteConnectorDatabase extends SQLiteAndroidDatabase {
     private JSONObject executeSQLiteStatement(String query, JSONArray paramsAsJson,
                                               final int funcCallback) throws JSONException, SQLException {
         JSONObject rowsResult = new JSONObject();
-
         boolean hasRows = false;
-
         SQLiteStatement myStatement = mydb.prepareStatement(query);
-
         try {
-            String[] params = null;
-
-            params = new String[paramsAsJson.length()];
-
-            for (int i = 0; i < paramsAsJson.length(); ++i) {
-                if (paramsAsJson.isNull(i)) {
-                    myStatement.bindNull(i + 1);
-                } else {
-                    Object p = paramsAsJson.get(i);
-                    if (p instanceof Float || p instanceof Double)
-                        myStatement.bindDouble(i + 1, paramsAsJson.getDouble(i));
-                    else if (p instanceof Number)
-                        myStatement.bindLong(i + 1, paramsAsJson.getLong(i));
-                    else
-                        myStatement.bindTextNativeString(i + 1, paramsAsJson.getString(i));
+            if (null != paramsAsJson) {
+                String[] params = null;
+                params = new String[paramsAsJson.length()];
+                for (int i = 0; i < paramsAsJson.length(); ++i) {
+                    if (paramsAsJson.isNull(i)) {
+                        myStatement.bindNull(i + 1);
+                    } else {
+                        Object p = paramsAsJson.get(i);
+                        if (p instanceof Float || p instanceof Double)
+                            myStatement.bindDouble(i + 1, paramsAsJson.getDouble(i));
+                        else if (p instanceof Number)
+                            myStatement.bindLong(i + 1, paramsAsJson.getLong(i));
+                        else
+                            myStatement.bindTextNativeString(i + 1, paramsAsJson.getString(i));
+                    }
                 }
             }
-
             hasRows = myStatement.step();
-        } catch (SQLException ex) {
+        } catch (SQLException | JSONException ex) {
             ex.printStackTrace();
             String errorMessage = ex.getMessage();
             Log.v("executeSqlBatch", "SQLitePlugin.executeSql[Batch](): Error=" + errorMessage);
-
-            // cleanup statement and throw the exception:
-            myStatement.dispose();
-            throw ex;
-        } catch (JSONException ex) {
-            ex.printStackTrace();
-            String errorMessage = ex.getMessage();
-            Log.v("executeSqlBatch", "SQLitePlugin.executeSql[Batch](): Error=" + errorMessage);
-
+            this.sqLitePlugin.callbackToJs(funcCallback, false, 1, errorMessage);
             // cleanup statement and throw the exception:
             myStatement.dispose();
             throw ex;

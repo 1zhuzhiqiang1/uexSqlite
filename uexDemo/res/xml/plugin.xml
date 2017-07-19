@@ -14,5 +14,8 @@
         className="io.sqlc.SQLitePlugin"
         uexName="SQLitePlugin">
         <method name="open" />
+        <method name="close" />
+        <method name="executeSql" />
+        <method name="delete" />
     </plugin>
 </uexplugins>

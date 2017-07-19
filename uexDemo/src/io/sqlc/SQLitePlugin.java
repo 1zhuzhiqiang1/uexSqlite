@@ -33,38 +33,59 @@ public class SQLitePlugin extends EUExBase {
         super(context, eBrowserView);
     }
 
+    /**
+     * 打印输出
+     *
+     * @param params [{value: 'test-string'}]
+     */
     public void echoStringValue(String[] params) {
-        int funcDialogCallback = -1;
+        int funcCallback = -1;
         if (params.length > 1) {
-            funcDialogCallback = Integer.parseInt(params[1]);
+            funcCallback = Integer.parseInt(params[1]);
         }
-        callbackToJs(funcDialogCallback, false, params[0]);
+        callbackToJs(funcCallback, false, params[0]);
     }
 
+    /**
+     * 打开数据库
+     *
+     * @param params [{name: 'demo.db', location: 'default'}]
+     * @throws JSONException
+     */
     public void open(String[] params) throws JSONException {
         int funcCallback = -1;
         if (params.length > 1) {
             funcCallback = Integer.parseInt(params[1]);
         }
         JSONArray args = new JSONArray(params[0]);
-        JSONObject o = args.getJSONObject(0);
-        String dbname = o.getString("name");
+        JSONObject options = args.getJSONObject(0);
+        String dbname = options.getString("name");
         // open database and start reading its queue
-        this.startDatabase(dbname, o, funcCallback);
+        this.startDatabase(dbname, options, funcCallback);
     }
 
+    /**
+     * 关闭数据库
+     *
+     * @param params [{path: this.dbname}]
+     * @throws JSONException
+     */
     public void close(String[] params) throws JSONException {
         int funcCallback = -1;
         if (params.length > 1) {
             funcCallback = Integer.parseInt(params[1]);
         }
-        JSONArray args = new JSONArray(params[0]);
-        JSONObject o = args.getJSONObject(0);
-        String dbname = o.getString("path");
+        String dbname = params[0];
         // put request in the q to close the db
         this.closeDatabase(dbname, funcCallback);
     }
 
+    /**
+     * 删除数据库
+     *
+     * @param params [args]
+     * @throws JSONException
+     */
     public void delete(String[] params) throws JSONException {
         int funcCallback = -1;
         if (params.length > 1) {
@@ -76,39 +97,48 @@ public class SQLitePlugin extends EUExBase {
         deleteDatabase(dbname, funcCallback);
     }
 
-    public void executeSqlBatch(String[] params) {
-
+    /**
+     * 执行sql语句
+     *
+     * @param params [{dbargs: {dbname: this.db.dbname},executes: tropts}] tropts:{sql:"",params:""}
+     */
+    public void executeSql(String[] params) {
+        backgroundExecuteSqlBatch(params);
     }
 
-    public void backgroundExecuteSqlBatch(String[] params) {
+    private void backgroundExecuteSqlBatch(String[] params) {
         int funcCallback = -1;
         if (params.length > 1) {
             funcCallback = Integer.parseInt(params[1]);
         }
-        String dbname = params[0];
         try {
-            JSONArray txargs = new JSONArray(params[1]);
+            JSONArray tropts = new JSONArray(params[0]);
+            JSONObject jsonObject = tropts.optJSONObject(0);
+            JSONObject dbargs = jsonObject.optJSONObject("dbargs");
+            String dbname = dbargs.optString("dbname");//数据库名称
+            JSONArray txargs = jsonObject.optJSONArray("executes");
             if (txargs.isNull(0)) {
                 callbackToJs(funcCallback, false, 1, "missing executes list");
             } else {
                 int len = txargs.length();
                 String[] queries = new String[len];
                 JSONArray[] jsonparams = new JSONArray[len];
-
                 for (int i = 0; i < len; i++) {
-                    JSONObject a = txargs.getJSONObject(i);
-                    queries[i] = a.getString("sql");
-                    jsonparams[i] = a.getJSONArray("params");
+                    JSONObject a = txargs.optJSONObject(i);
+                    queries[i] = a.optString("sql");
+                    jsonparams[i] = a.optJSONArray("params");
                 }
                 // put db query in the queue to be executed in the db thread:
                 DBQuery q = new DBQuery(queries, jsonparams);
                 DBRunner r = dbrmap.get(dbname);
                 if (r != null) {
                     try {
+                        r.setFunCallback(funcCallback);
                         r.q.put(q);
+                        new Thread(r).start();
                     } catch (Exception e) {
                         Log.e(SQLitePlugin.class.getSimpleName(), "couldn't add to queue", e);
-//                        callbackToJs().error("couldn't add to queue");
+                        callbackToJs(funcCallback, false, 1, "couldn't add to queue");
                     }
                 } else {
                     callbackToJs(funcCallback, false, 1, "database not open");
@@ -122,7 +152,9 @@ public class SQLitePlugin extends EUExBase {
     /**
      * Clean up and close all open databases.
      */
+    @Override
     public void destroy() {
+        super.destroy();
         while (!dbrmap.isEmpty()) {
             String dbname = dbrmap.keySet().iterator().next();
             this.closeDatabaseNow(dbname);
@@ -150,7 +182,7 @@ public class SQLitePlugin extends EUExBase {
             // don't orphan the existing thread; just re-open the existing database.
             // In the worst case it might be in the process of closing, but even that's less serious
             // than orphaning the old DBRunner.
-//            cbc.success();
+            callbackToJs(funCallback, false, 0, "打开数据库成功");
         } else {
             r = new DBRunner(dbname, options, funCallback, this);
             dbrmap.put(dbname, r);
@@ -183,7 +215,7 @@ public class SQLitePlugin extends EUExBase {
 
             SQLiteAndroidDatabase mydb = old_impl ? new SQLiteAndroidDatabase(this) : new SQLiteConnectorDatabase(this);
             mydb.open(dbfile);
-            callbackToJs(funcCallback, false, 0);
+//            callbackToJs(funcCallback, false, 0);
             return mydb;
         } catch (Exception e) {
             callbackToJs(funcCallback, false, 1, "can't open database " + e);
@@ -199,14 +231,14 @@ public class SQLitePlugin extends EUExBase {
     private void closeDatabase(String dbname, final int funcCallback) {
         DBRunner r = dbrmap.get(dbname);
         if (r != null) {
-            try {
-                r.q.put(new DBQuery(false));
-            } catch (Exception e) {
-                callbackToJs(funcCallback, false, 1, "couldn't close database" + e);
-                Log.e(SQLitePlugin.class.getSimpleName(), "couldn't close database", e);
+            SQLiteAndroidDatabase mydb = r.mydb;
+            if (mydb != null) {
+                mydb.closeDatabaseNow();
+                dbrmap.remove(dbname);
+                callbackToJs(funcCallback, false, 0, "Database close success");
             }
-        } else {
-            callbackToJs(funcCallback, false, 0);
+        }else{
+            callbackToJs(funcCallback, false, 0, "Database close success");
         }
     }
 
@@ -290,6 +322,10 @@ public class SQLitePlugin extends EUExBase {
             this.sqLitePlugin = sqLitePlugin;
         }
 
+        public void setFunCallback(int funCallback) {
+            this.funCallback = funCallback;
+        }
+
         public void run() {
             try {
                 this.mydb = openDatabase(dbname, this.oldImpl, funCallback);
@@ -298,30 +334,22 @@ public class SQLitePlugin extends EUExBase {
                 dbrmap.remove(dbname);
                 return;
             }
-
             DBQuery dbq = null;
-
             try {
                 dbq = q.take();
-
                 while (!dbq.stop) {
                     mydb.executeSqlBatch(dbq.queries, dbq.jsonparams, funCallback);
-
                     if (this.bugWorkaround && dbq.queries.length == 1 && dbq.queries[0] == "COMMIT")
                         mydb.bugWorkaround();
-
                     dbq = q.take();
                 }
             } catch (Exception e) {
                 Log.e(SQLitePlugin.class.getSimpleName(), "unexpected error", e);
             }
-
             if (dbq != null && dbq.close) {
                 try {
                     closeDatabaseNow(dbname);
-
                     dbrmap.remove(dbname); // (should) remove ourself
-
                     if (!dbq.delete) {
                         sqLitePlugin.callbackToJs(funCallback, false, 0);
                     } else {

@@ -1,3 +1,8 @@
+1. callbackToJs(funcCallback, false, 1, "database not open");
+    第三个参数代表是否有错误 1:有 0:没有
+
+
+
 # AppcanPluginDemo-Gradle
 AppCan Android 插件demo
 
